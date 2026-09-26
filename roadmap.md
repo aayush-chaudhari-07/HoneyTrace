@@ -1,0 +1,11 @@
+# Roadmap
+- [x] Login & accounts (email + Google) with beekeeper profiles
+- [x] Beekeeper Dashboard (hives, metrics, alerts, harvest recommendations)
+- [x] Real batch data in database, feeding Verify and Batch Trail
+- [x] Unified route transitions and pending state
+- [x] Persistent internal BeeSwarm
+- [x] Consistent button feedback
+- [x] Honeycomb loading states
+- [x] Illustrated dashboard and batch empty states
+- [x] Mobile layout checks on Home, Verify entry, and Verify batch (no horizontal overflow)
+- [x] Handle missing backend gracefully — app renders with a banner and friendly not-found/error states instead of a blank crash; reconnect Lovable Cloud (blocked on workspace credits) to bring data, logins, and jar verification online.
