@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 
 import healthRoutes from "./routes/health.routes.js";
+import usersRoutes from "./routes/users.routes.js";
 import hivesRoutes from "./routes/hives.routes.js";
 import batchesRoutes from "./routes/batches.routes.js";
 import custodyRoutes from "./routes/custody.routes.js";
@@ -40,6 +41,7 @@ app.use("/", healthRoutes);
 app.use("/api", healthRoutes);
 
 // API Routes
+app.use("/api/users", usersRoutes);
 app.use("/api/hives", hivesRoutes);
 app.use("/api/batches", batchesRoutes);
 app.use("/api/custody", custodyRoutes);
