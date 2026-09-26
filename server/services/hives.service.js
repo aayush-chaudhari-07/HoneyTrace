@@ -1,8 +1,10 @@
 import { supabaseAdmin } from "../config/supabase.js";
+import { weatherService } from "./weather.service.js";
 
 /**
  * Validates sensor reading values to ensure they fall within realistic ranges.
  */
+
 export function validateReadingRanges(body) {
   const errors = [];
   const { temperature, humidity, weight, activity_level } = body;
@@ -135,12 +137,22 @@ export const hivesService = {
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
     );
 
+    // Fetch weather context for hive coordinates with fallback handling
+    let weather = null;
+    try {
+      weather = await weatherService.getWeatherForLocation(data.location_lat, data.location_lng);
+    } catch (err) {
+      console.warn("⚠️ Weather fetch fallback for hive:", err.message);
+    }
+
     return {
       ...data,
       readings,
       latest_reading: readings[0] || null,
+      weather,
     };
   },
+
 
   async createHive(hiveData) {
     const { data, error } = await supabaseAdmin

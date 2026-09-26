@@ -6,13 +6,15 @@ import {
   updateBatch,
   sealBatch,
   updateBatchStatus,
+  getBatchTrustScore,
 } from "../controllers/batches.controller.js";
 import { requireAuth, requireRole } from "../middleware/auth.middleware.js";
 
 const router = Router();
 
-// Public route for consumer verification
+// Public routes for consumer verification & trust score
 router.get("/:id", getBatchById);
+router.get("/:id/trust-score", getBatchTrustScore);
 
 // Authenticated routes
 router.use(requireAuth);
@@ -24,3 +26,4 @@ router.post("/:id/seal", requireRole("beekeeper", "admin"), sealBatch);
 router.patch("/:id/status", updateBatchStatus);
 
 export default router;
+

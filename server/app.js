@@ -10,7 +10,10 @@ import custodyRoutes from "./routes/custody.routes.js";
 import labRoutes from "./routes/lab.routes.js";
 import feedbackRoutes from "./routes/feedback.routes.js";
 import aiRoutes from "./routes/ai.routes.js";
+import partnerRoutes from "./routes/partner.routes.js";
+import publicRoutes from "./routes/public.routes.js";
 import { errorHandler } from "./middleware/error.middleware.js";
+import { requestLogger } from "./middleware/logger.middleware.js";
 
 dotenv.config();
 
@@ -35,6 +38,8 @@ app.use(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(requestLogger);
+
 
 // Health Check Endpoints
 app.use("/", healthRoutes);
@@ -46,8 +51,12 @@ app.use("/api/hives", hivesRoutes);
 app.use("/api/batches", batchesRoutes);
 app.use("/api/custody", custodyRoutes);
 app.use("/api/lab", labRoutes);
+app.use("/api/partner", partnerRoutes);
+app.use("/api/public", publicRoutes);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/ai", aiRoutes);
+
+
 
 // 404 Route Handler
 app.use((req, res) => {

@@ -108,3 +108,16 @@ export const updateBatchStatus = async (req, res, next) => {
     next(err);
   }
 };
+
+export const getBatchTrustScore = async (req, res, next) => {
+  try {
+    const trustScoreData = await batchesService.getBatchTrustScore(req.params.id);
+    if (!trustScoreData) {
+      return res.status(404).json({ error: "Batch not found" });
+    }
+    res.status(200).json(trustScoreData);
+  } catch (err) {
+    next(err);
+  }
+};
+

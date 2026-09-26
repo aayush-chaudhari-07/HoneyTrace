@@ -2,36 +2,32 @@ import { spawn } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
 import { supabaseAdmin } from "../config/supabase.js";
+import { weatherService } from "./weather.service.js";
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PYTHON_SCRIPT_PATH = path.resolve(__dirname, "../ai_engine/harvest_ai.py");
 
 /**
- * Fetches free 7-day ambient weather forecast from Open-Meteo API.
+ * Fetches ambient weather forecast using weatherService (OpenWeatherMap / Open-Meteo).
  */
 export async function fetchWeatherForecast(lat, lng) {
   try {
-    const latitude = lat ?? 12.5;
-    const longitude = lng ?? 75.8;
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&daily=temperature_2m_max,precipitation_sum&timezone=auto`;
-    
-    const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
-    if (!response.ok) return [];
+    const weatherData = await weatherService.getWeatherForLocation(lat ?? 12.5, lng ?? 75.8);
+    if (!weatherData || !weatherData.forecast) return [];
 
-    const data = await response.json();
-    if (!data.daily || !data.daily.time) return [];
-
-    return data.daily.time.map((timeStr, index) => ({
-      date: timeStr,
-      precipitation_sum: data.daily.precipitation_sum?.[index] ?? 0,
-      temperature_2m_max: data.daily.temperature_2m_max?.[index] ?? 25,
+    return weatherData.forecast.map((f) => ({
+      date: f.date,
+      precipitation_sum: f.precipitation_sum ?? 0,
+      temperature_2m_max: f.temp_max ?? 25,
     }));
   } catch (err) {
-    console.warn("⚠️ Open-Meteo Weather API warning:", err.message);
+    console.warn("⚠️ Weather forecast fetch error in AI service:", err.message);
     return [];
   }
 }
+
 
 /**
  * Executes the Python Smart Harvest AI engine script via child process.

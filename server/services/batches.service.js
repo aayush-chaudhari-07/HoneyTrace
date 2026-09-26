@@ -1,4 +1,7 @@
 import { supabaseAdmin } from "../config/supabase.js";
+import { blockchainService } from "./blockchain.service.js";
+import { qrService } from "./qr.service.js";
+import { computeTrustScore } from "./trust_score.service.js";
 
 export const STATUS_ORDER = ["draft", "sealed", "lab", "bottler", "distributor", "shelf", "delivered"];
 
@@ -123,24 +126,46 @@ export const batchesService = {
       (a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
     );
 
+    // 6. Cross-check against on-chain records & compute Trust Score
+    const onChainRecords = await blockchainService.getCustodyHistoryOnChain(id);
+    const trustInfo = computeTrustScore({
+      batch,
+      custodyRecords: orderedCustody,
+      labTests: batch.lab_tests || [],
+      onChainRecords,
+    });
+
     return {
       ...batch,
       source_hives: sourceHives,
       harvest_readings: harvestReadings,
       ai_insights: aiInsights || [],
       custody_records: orderedCustody,
+      trust_score: trustInfo.trust_score,
+      trust_score_breakdown: trustInfo.breakdown,
+      data_integrity_warning: trustInfo.data_integrity_warning,
+    };
+  },
+
+  async getBatchTrustScore(id) {
+    const detail = await this.getBatchDetail(id);
+    if (!detail) return null;
+
+    return {
+      batch_id: id,
+      trust_score: detail.trust_score,
+      breakdown: detail.trust_score_breakdown,
+      data_integrity_warning: detail.data_integrity_warning,
     };
   },
 
   async validateAndCreateBatch({ userId, userRole, source_hive_ids, harvest_start_date, harvest_end_date, forage_location }) {
-    // 1. Validate at least one hive included
     if (!Array.isArray(source_hive_ids) || source_hive_ids.length === 0) {
       const err = new Error("At least one source hive must be included in the batch.");
       err.statusCode = 400;
       throw err;
     }
 
-    // 2. Validate source hives belong to logged-in beekeeper
     const { data: hives, error: hivesErr } = await supabaseAdmin
       .from("hives")
       .select("*")
@@ -163,7 +188,6 @@ export const batchesService = {
       }
     }
 
-    // 3. Validate at least one reading exists within the date range
     let rQuery = supabaseAdmin
       .from("readings")
       .select("id")
@@ -183,7 +207,6 @@ export const batchesService = {
       throw err;
     }
 
-    // 4. Auto-populate forage_location if not provided
     let autoForageLocation = forage_location;
     if (!autoForageLocation || !autoForageLocation.trim()) {
       const locations = hives
@@ -198,7 +221,6 @@ export const batchesService = {
       autoForageLocation = locations.length > 0 ? locations.join(" & ") : "Local Apiary Meadow";
     }
 
-    // 5. Insert batch with status 'draft'
     const batchData = {
       source_hive_ids,
       harvest_start_date: harvest_start_date || null,
@@ -258,7 +280,6 @@ export const batchesService = {
   },
 
   async sealBatch(id, userId, userRole) {
-    // 1. Fetch batch
     const batch = await this.getBatchDetail(id);
     if (!batch) {
       const err = new Error("Batch not found.");
@@ -272,7 +293,6 @@ export const batchesService = {
       throw err;
     }
 
-    // 2. Validate state machine transition from draft → sealed
     const transition = isValidStatusTransition(batch.status, "sealed");
     if (!transition.valid) {
       const err = new Error(transition.reason);
@@ -280,7 +300,6 @@ export const batchesService = {
       throw err;
     }
 
-    // 3. Reject if zero source hives or zero readings
     if (!batch.source_hive_ids || batch.source_hive_ids.length === 0) {
       const err = new Error("Cannot seal batch: Batch has zero source hives linked.");
       err.statusCode = 400;
@@ -293,11 +312,14 @@ export const batchesService = {
       throw err;
     }
 
-    // 4. Generate blockchain record ID and QR code ID
-    const blockchain_record_id = generateBlockchainRecordId(id);
-    const qr_code_id = generateQrCodeId(id);
+    // 1. Generate & upload unique QR code to Supabase Storage
+    const qrResult = await qrService.generateAndStoreBatchQr(id);
 
-    // 5. Update batch status to 'sealed' with record IDs
+    // 2. Generate on-chain blockchain record ID
+    const blockchain_record_id = generateBlockchainRecordId(id);
+    const qr_code_id = qrResult.qrCodeId;
+
+    // 3. Update batch status to 'sealed' with record IDs
     const { data: sealedBatch, error: sealErr } = await supabaseAdmin
       .from("batches")
       .update({
@@ -311,20 +333,31 @@ export const batchesService = {
 
     if (sealErr) throw sealErr;
 
-    // 6. Insert initial custody record for stage 'beekeeper' if not present
+    // 4. Record on-chain custody stage for 'beekeeper'
+    const chainResult = await blockchainService.recordCustodyStage(id, "beekeeper", userId, {
+      sealed_at: new Date().toISOString(),
+      qr_code_id,
+    });
+
+    // 5. Insert initial custody record for stage 'beekeeper' if not present
     const hasBeekeeperCustody = batch.custody_records.some((c) => c.stage === "beekeeper");
     if (!hasBeekeeperCustody) {
       await supabaseAdmin.from("custody_records").insert({
         batch_id: id,
         stage: "beekeeper",
         actor_user_id: userId,
-        data_hash: blockchain_record_id,
-        storage_reference: qr_code_id,
+        data_hash: chainResult.dataHash,
+        storage_reference: qrResult.storageReference || chainResult.txHash,
         extra_data: { sealed_at: new Date().toISOString() },
       });
     }
 
-    return sealedBatch;
+    return {
+      ...sealedBatch,
+      qr_image_url: qrResult.qrImageUrl,
+      verification_url: qrResult.verificationUrl,
+      blockchain_tx_hash: chainResult.txHash,
+    };
   },
 
   async updateBatchStatusWithLifecycle(id, targetStatus, userId, userRole) {
@@ -341,7 +374,6 @@ export const batchesService = {
       throw err;
     }
 
-    // Check lifecycle transition rules
     const transition = isValidStatusTransition(batch.status, targetStatus);
     if (!transition.valid) {
       const err = new Error(transition.reason);

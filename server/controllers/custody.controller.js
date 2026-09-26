@@ -11,8 +11,8 @@ const STAGE_PERMISSIONS = {
 
 export const getCustodyRecords = async (req, res, next) => {
   try {
-    const records = await custodyService.getCustodyForBatch(req.params.batchId);
-    res.json({ custody_records: records });
+    const result = await custodyService.getCustodyForBatch(req.params.batchId);
+    res.status(200).json(result);
   } catch (err) {
     next(err);
   }
@@ -20,7 +20,7 @@ export const getCustodyRecords = async (req, res, next) => {
 
 export const addCustodyRecord = async (req, res, next) => {
   try {
-    const { batch_id, stage, data_hash, storage_reference, extra_data } = req.body;
+    const { batch_id, stage, storage_reference, extra_data } = req.body;
 
     const allowedRoles = STAGE_PERMISSIONS[stage];
     if (!allowedRoles || (!allowedRoles.includes(req.userRole) && req.userRole !== "admin")) {
@@ -38,7 +38,6 @@ export const addCustodyRecord = async (req, res, next) => {
       batch_id,
       stage,
       actor_user_id: req.user.id,
-      data_hash,
       storage_reference,
       extra_data: extra_data || {},
     });
@@ -50,8 +49,12 @@ export const addCustodyRecord = async (req, res, next) => {
       distributor: "distributor",
       shelf: "shelf",
     };
-    if (statusMap[stage]) {
-      await batchesService.updateBatchStatus(batch_id, statusMap[stage]);
+    if (statusMap[stage] && batch.status !== statusMap[stage]) {
+      try {
+        await batchesService.updateBatchStatusWithLifecycle(batch_id, statusMap[stage], req.user.id, req.userRole);
+      } catch (e) {
+        console.warn("⚠️ Batch status update note:", e.message);
+      }
     }
 
     res.status(201).json({ custody_record: record });
