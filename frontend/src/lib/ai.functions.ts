@@ -17,13 +17,14 @@ export const analyzeHive = createServerFn({ method: "POST" })
       .limit(40);
     if (!rows || rows.length < 2) return { anomalies: [] as string[] };
 
-    const key = process.env["LOVABLE_API_KEY"];
-    if (!key) throw new Error("AI is not configured");
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const key = process.env["AI_API_KEY"] || process.env["OPENAI_API_KEY"];
+    const endpoint = process.env["AI_API_ENDPOINT"] || "https://api.openai.com/v1/chat/completions";
+    if (!key) throw new Error("AI is not configured (set AI_API_KEY or OPENAI_API_KEY in .env)");
+    const res = await fetch(endpoint, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: process.env["AI_MODEL"] || "gpt-4o-mini",
         messages: [
           { role: "system", content: "You are an expert apiarist. Review hive sensor/journal readings (newest first). Healthy brood: 32-36°C, humidity 50-65%. Flag only genuine anomalies or worrying trends (sudden weight loss, activity collapse, temperature swings, concerning notes). Each item: one short plain-English sentence with the suggested action. Return an empty list if nothing is wrong." },
           { role: "user", content: `Hive "${hive.name}" readings:\n${JSON.stringify(rows)}` },

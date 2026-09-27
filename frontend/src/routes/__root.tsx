@@ -14,7 +14,6 @@ import appCss from "../styles.css?url";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import PageTransition from "../components/PageTransition";
-import { reportLovableError } from "../lib/lovable-error-reporting";
 import { supabase } from "@/integrations/supabase/client";
 import { Toaster } from "@/components/ui/sonner";
 import { Button } from "@/components/ui/button";
@@ -40,9 +39,6 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background px-4">
@@ -132,7 +128,7 @@ function CloudBanner() {
     <div role="status" className="border-b border-primary/30 bg-accent px-4 py-2 text-center text-xs font-medium text-foreground sm:text-sm">
       <span className="inline-flex items-center gap-2">
         <CloudOff className="h-4 w-4 shrink-0 text-primary-deep" />
-        HoneyTrace's data service isn't connected yet — connect Lovable Cloud to enable accounts, hives, and jar verification.
+        HoneyTrace's data service isn't connected yet — configure VITE_SUPABASE_URL in .env to enable accounts, hives, and jar verification.
       </span>
     </div>
   );
