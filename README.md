@@ -8,8 +8,9 @@ HoneyTrace is an end-to-end honey traceability and smart beekeeping platform tha
 
 ```
 /honeytrace
-  ├── /frontend      # Self-contained React + Vite + Tailwind CSS app (.env & .env.example)
-  ├── /backend       # Node.js + Express API server (.env & .env.example)
+  ├── /frontend      # Self-contained React + Vite + Tailwind CSS app
+  ├── /backend       # Node.js + Express API server
+  ├── .env           # Single root environment configuration file
   └── README.md      # Setup documentation
 ```
 
@@ -55,25 +56,27 @@ npm install
 
 ### 2. Environment Configuration
 
-The repository uses exactly two environment files — one for the frontend and one for the backend.
+The repository uses **EXACTLY ONE `.env` file**, located in the main project root folder (`/.env`). Both the frontend (via Vite `envDir`) and backend (via `dotenv`) read from this single root file.
 
-Copy `.env.example` templates to `.env` in both `/frontend` and `/backend` directories:
+Create a file named `.env` in the root folder with the following inline structure:
 
-#### Frontend Environment Setup (`/frontend/.env`)
 ```env
+# ==============================================================================
+# HoneyTrace Single Root Environment Configuration (.env)
+# ==============================================================================
+
+# Frontend Variables (Vite client-side)
 VITE_SUPABASE_URL=https://your-supabase-project.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
 VITE_SUPABASE_ANON_KEY=your-supabase-publishable-key
 VITE_BACKEND_URL=http://localhost:5000
-```
 
-#### Backend Environment Setup (`/backend/.env`)
-```env
+# Backend Server Configuration
 PORT=5000
 NODE_ENV=development
 FRONTEND_URL=http://localhost:5173
 
-# Supabase Credentials
+# Supabase Backend Service Credentials
 SUPABASE_URL=https://your-supabase-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key

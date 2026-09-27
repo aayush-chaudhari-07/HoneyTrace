@@ -1,6 +1,6 @@
+import "./config/env.js";
 import express from "express";
 import cors from "cors";
-import dotenv from "dotenv";
 
 import healthRoutes from "./routes/health.routes.js";
 import usersRoutes from "./routes/users.routes.js";
