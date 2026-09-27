@@ -8,9 +8,8 @@ HoneyTrace is an end-to-end honey traceability and smart beekeeping platform tha
 
 ```
 /honeytrace
-  ├── /frontend      # Self-contained React + Vite + Tailwind CSS app
-  ├── /backend       # Node.js + Express API server with Blockchain & AI engines
-  ├── .env.example   # Environment configuration template
+  ├── /frontend      # Self-contained React + Vite + Tailwind CSS app (.env & .env.example)
+  ├── /backend       # Node.js + Express API server (.env & .env.example)
   └── README.md      # Setup documentation
 ```
 
@@ -56,12 +55,15 @@ npm install
 
 ### 2. Environment Configuration
 
-Copy `.env.example` templates to `.env` in both `/frontend` and `/backend` directories.
+The repository uses exactly two environment files — one for the frontend and one for the backend.
+
+Copy `.env.example` templates to `.env` in both `/frontend` and `/backend` directories:
 
 #### Frontend Environment Setup (`/frontend/.env`)
 ```env
 VITE_SUPABASE_URL=https://your-supabase-project.supabase.co
 VITE_SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+VITE_SUPABASE_ANON_KEY=your-supabase-publishable-key
 VITE_BACKEND_URL=http://localhost:5000
 ```
 
@@ -75,6 +77,7 @@ FRONTEND_URL=http://localhost:5173
 SUPABASE_URL=https://your-supabase-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-role-key
 SUPABASE_PUBLISHABLE_KEY=your-supabase-publishable-key
+SUPABASE_ANON_KEY=your-supabase-publishable-key
 
 # Blockchain Configuration (EVM RPC & Smart Contract)
 RPC_URL=http://127.0.0.1:8545
@@ -89,6 +92,9 @@ MAPS_API_KEY=your-maps-api-key
 AI_API_KEY=your-ai-api-key
 AI_API_ENDPOINT=https://api.openai.com/v1/chat/completions
 AI_MODEL=gpt-4o-mini
+
+# Database Migration Connection URL
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/honeytrace
 ```
 
 ---
