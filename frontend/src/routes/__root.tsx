@@ -119,16 +119,24 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function CloudBanner() {
-  const [disconnected, setDisconnected] = useState(false);
+  const [status, setStatus] = useState<"connected" | "disconnected">("disconnected");
   useEffect(() => {
-    if (!import.meta.env.VITE_SUPABASE_URL) setDisconnected(true);
+    const url = import.meta.env.VITE_SUPABASE_URL;
+    const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (url && key && !url.includes("supabase-not-connected.invalid")) {
+      setStatus("connected");
+    } else {
+      setStatus("disconnected");
+    }
   }, []);
-  if (!disconnected) return null;
+
+  if (status === "connected") return null;
+
   return (
-    <div role="status" className="border-b border-primary/30 bg-accent px-4 py-2 text-center text-xs font-medium text-foreground sm:text-sm">
+    <div role="status" className="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-center text-xs font-medium text-amber-900 dark:text-amber-200 sm:text-sm">
       <span className="inline-flex items-center gap-2">
-        <CloudOff className="h-4 w-4 shrink-0 text-primary-deep" />
-        HoneyTrace's data service isn't connected yet — configure VITE_SUPABASE_URL in .env to enable accounts, hives, and jar verification.
+        <CloudOff className="h-4 w-4 shrink-0 text-amber-600" />
+        HoneyTrace Supabase backend is not connected. Please add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY to frontend/.env and restart the dev server.
       </span>
     </div>
   );
@@ -158,6 +166,7 @@ function RootComponent() {
           </PageTransition>
         </main>
         <Footer />
+        <Toaster position="top-right" richColors />
       </div>
     </QueryClientProvider>
   );

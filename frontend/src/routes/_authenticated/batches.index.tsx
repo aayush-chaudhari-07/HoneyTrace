@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, ArrowRight, CalendarDays, Hexagon, MapPin, Plus, Sparkles, X } from "lucide-react";
 import { toast } from "sonner";
@@ -17,8 +17,14 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { listHives } from "@/lib/hives";
 import { listMyBatches, readingsInRange, recommend } from "@/lib/batch-manage";
+import { getMyRoles } from "@/lib/roles";
 
 export const Route = createFileRoute("/_authenticated/batches/")({
+  beforeLoad: async ({ context }) => {
+    const roles = await getMyRoles(context.user.id);
+    const isBeekeeperOrAdmin = roles.includes("admin") || roles.includes("beekeeper");
+    if (!isBeekeeperOrAdmin) throw redirect({ to: "/partner" });
+  },
   head: () => ({
     meta: [
       { title: "My Batches — HoneyTrace" },

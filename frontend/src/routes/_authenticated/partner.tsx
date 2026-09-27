@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Check, FlaskConical, Package, Store, Truck, X } from "lucide-react";
 import { toast } from "sonner";
@@ -16,6 +16,11 @@ import { AppShell } from "@/components/AppShell";
 import { HoneycombLoader, HoneycombSpinner } from "@/components/HoneycombLoader";
 
 export const Route = createFileRoute("/_authenticated/partner")({
+  beforeLoad: async ({ context }) => {
+    const roles = await getMyRoles(context.user.id);
+    const isPartnerOrAdmin = roles.includes("admin") || roles.some((r) => (PARTNER_ROLES as readonly string[]).includes(r));
+    if (!isPartnerOrAdmin) throw redirect({ to: "/dashboard" });
+  },
   head: () => ({
     meta: [
       { title: "Partner Queue — HoneyTrace" },

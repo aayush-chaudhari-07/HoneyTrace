@@ -22,7 +22,10 @@ export function Footer() {
     <footer className="honeycomb-bg mt-24 border-t border-border/70 bg-espresso text-background">
       <div className="mx-auto grid max-w-6xl gap-10 px-5 py-14 sm:grid-cols-2 md:grid-cols-4">
         <div className="sm:col-span-2">
-          <p className="font-display text-2xl">HoneyTrace</p>
+          <Link to="/" className="inline-flex items-center gap-3">
+            <img src="/logo.png" alt="HoneyTrace Logo" className="h-10 w-10 object-contain" />
+            <span className="font-display text-2xl text-background">HoneyTrace</span>
+          </Link>
           <p className="mt-3 max-w-sm text-sm text-background/70">
             Hive-to-jar traceability and smart beekeeping, built for honest honey.
           </p>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { Activity, CalendarClock, ClipboardPlus, Droplets, Plus, Scale, Thermometer } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,8 +13,14 @@ import { HiveHexGrid } from "@/components/HiveHexGrid";
 import { EmptyState } from "@/components/EmptyState";
 import { HoneycombLoader } from "@/components/HoneycombLoader";
 import { healthOf, issuesFor, listHives, type Health, type Hive, type Issue } from "@/lib/hives";
+import { getMyRoles } from "@/lib/roles";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
+  beforeLoad: async ({ context }) => {
+    const roles = await getMyRoles(context.user.id);
+    const isBeekeeperOrAdmin = roles.includes("admin") || roles.includes("beekeeper");
+    if (!isBeekeeperOrAdmin) throw redirect({ to: "/partner" });
+  },
   head: () => ({
     meta: [
       { title: "Live Hive Dashboard — HoneyTrace" },

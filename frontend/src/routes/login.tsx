@@ -97,6 +97,7 @@ function LoginPage() {
         const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` });
         if (error) throw error;
         setNotice("If that email has an account, a reset link is on its way.");
+        toast.success("Password reset email sent.");
       } else if (mode === "signup") {
         const { data, error } = await supabase.auth.signUp({
           email,
@@ -104,17 +105,55 @@ function LoginPage() {
           options: { emailRedirectTo: `${window.location.origin}/login`, data: { full_name: name.trim(), role } },
         });
         if (error) throw error;
-        if (data.session && data.user) await goHome(data.user.id);
-        else setNotice(`Almost there! Check ${email} for a confirmation link, then sign in.`);
+
+        const user = data.user;
+        if (user) {
+          // 1. Ensure user row exists in `users` table
+          const { error: userErr } = await supabase.from("users").upsert({
+            id: user.id,
+            email: user.email!,
+            name: name.trim(),
+            role: role!,
+            contact: null,
+          });
+          if (userErr) console.warn("[Supabase] Users table insert notice:", userErr.message);
+
+          // 2. Ensure role exists in `user_roles` table
+          const { error: roleErr } = await supabase.from("user_roles").upsert({
+            user_id: user.id,
+            role: role as any,
+          });
+          if (roleErr) console.warn("[Supabase] User roles insert notice:", roleErr.message);
+
+          // 3. Ensure profile exists in `profiles` table
+          const { error: profErr } = await supabase.from("profiles").upsert({
+            id: user.id,
+            display_name: name.trim(),
+          });
+          if (profErr) console.warn("[Supabase] Profiles insert notice:", profErr.message);
+        }
+
+        toast.success(`Account created for ${name.trim()} (${role})!`);
+
+        if (data.session && data.user) {
+          await goHome(data.user.id);
+        } else {
+          setNotice(`Account created! Check ${email} for a confirmation link, or sign in below.`);
+        }
       } else {
         const { data, error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        toast.success("Signed in successfully!");
         await goHome(data.user.id);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Something went wrong";
-      if (/invalid login/i.test(msg)) setErrors({ password: "Email or password isn't right — give it another try." });
-      else toast.error(msg);
+      const msg = err instanceof Error ? err.message : "Something went wrong during authentication";
+      if (/invalid login/i.test(msg)) {
+        setErrors({ password: "Email or password isn't right — give it another try." });
+      } else {
+        toast.error(msg);
+        setNotice(`Error: ${msg}`);
+      }
     } finally {
       setBusy(false);
     }
@@ -128,7 +167,13 @@ function LoginPage() {
         <div className="absolute -left-16 top-10 h-64 w-64 rounded-full bg-primary/30 blur-3xl" style={{ animation: "blob-float 9s ease-in-out infinite" }} />
         <div className="absolute -right-10 bottom-0 h-72 w-72 rounded-full bg-primary-deep/25 blur-3xl" style={{ animation: "blob-float 12s ease-in-out infinite reverse" }} />
         <BeeSwarm count={4} />
-        <div className="relative w-40 sm:w-52" style={{ animation: "jar-bob 5s ease-in-out infinite" }}>
+        
+        {/* Gold Monogram HT Logo Emblem */}
+        <div className="relative mb-6 flex flex-col items-center">
+          <img src="/logo.png" alt="HoneyTrace HT Monogram Logo" className="h-28 w-28 object-contain drop-shadow-lg transition-transform duration-500 hover:scale-105" />
+        </div>
+
+        <div className="relative w-36 sm:w-44" style={{ animation: "jar-bob 5s ease-in-out infinite" }}>
           <div className="aspect-[5/6]"><HoneyJar /></div>
         </div>
         <HoneyDrip distance={56} className="relative -mt-2" />
@@ -142,6 +187,10 @@ function LoginPage() {
       {/* ---------- Form panel ---------- */}
       <section className="flex items-center justify-center bg-background px-5 py-12">
         <div className="relative w-full max-w-md rounded-3xl border border-border bg-card p-7 shadow-[var(--shadow-honey)] sm:p-9">
+          <div className="mb-6 flex items-center justify-center gap-3 border-b border-border/50 pb-4">
+            <img src="/logo.png" alt="HoneyTrace Monogram Logo" className="h-10 w-10 object-contain" />
+            <span className="font-display text-2xl font-bold tracking-tight text-foreground">HoneyTrace</span>
+          </div>
           {success ? (
             <div className="flex flex-col items-center py-16 text-center">
               <span className="honeycomb-clip flex h-20 w-20 items-center justify-center bg-[image:var(--gradient-honey)] text-primary-foreground" style={{ animation: "success-pop 0.6s ease-out both" }}>

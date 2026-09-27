@@ -1,41 +1,39 @@
+import { useEffect, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useUser } from "@/hooks/useSession";
 import { BeeSwarm } from "@/components/BeeSwarm";
+import { getMyRoles, type AppRole, PARTNER_ROLES } from "@/lib/roles";
 
-const NAV_LINKS = [
+const PUBLIC_NAV_LINKS = [
   { to: "/platform", label: "Platform" },
   { to: "/traceability", label: "Traceability" },
   { to: "/about", label: "About" },
 ] as const;
-
-function HiveMark() {
-  return (
-    <span className="honeycomb-clip inline-flex h-9 w-9 shrink-0 items-center justify-center bg-[image:var(--gradient-honey)]">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-        <path
-          d="M12 2.5l8 4.6v9.8L12 21.5l-8-4.6V7.1z"
-          stroke="var(--color-espresso)"
-          strokeWidth="1.8"
-          strokeLinejoin="round"
-        />
-        <path d="M12 8.2l4 2.3v4.6L12 17.4l-4-2.3v-4.6z" fill="var(--color-espresso)" />
-      </svg>
-    </span>
-  );
-}
 
 export function Navbar() {
   const user = useUser();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  
+  const [roles, setRoles] = useState<AppRole[]>([]);
+
+  useEffect(() => {
+    if (user?.id) {
+      getMyRoles(user.id).then((r) => setRoles(r));
+    } else {
+      setRoles([]);
+    }
+  }, [user?.id]);
+
   const isInternal = Boolean(
     user || ["/dashboard", "/batches", "/hive", "/partner", "/profile", "/admin"].some((p) => pathname.startsWith(p))
   );
+
+  const isAdmin = roles.includes("admin");
+  const isPartnerOnly = roles.some((r) => (PARTNER_ROLES as readonly string[]).includes(r)) && !roles.includes("beekeeper") && !isAdmin;
 
   const signOut = async () => {
     await qc.cancelQueries();
@@ -53,13 +51,19 @@ export function Navbar() {
         />
       )}
       <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Link to="/" className="flex items-center gap-2.5">
-          <HiveMark />
-          <span className="font-display text-xl tracking-tight">HoneyTrace</span>
+        <Link to="/" className="flex items-center gap-3 group">
+          <img
+            src="/logo.png"
+            alt="HoneyTrace Logo"
+            className="h-9 w-9 object-contain transition-transform duration-300 group-hover:scale-105"
+          />
+          <span className="font-display text-xl tracking-tight text-foreground group-hover:text-primary-deep transition-colors">
+            HoneyTrace
+          </span>
         </Link>
 
-        <ul className="hidden items-center gap-7 md:flex">
-          {NAV_LINKS.map((link) => (
+        <ul className="hidden items-center gap-6 md:flex">
+          {PUBLIC_NAV_LINKS.map((link) => (
             <li key={link.to}>
               <Link
                 to={link.to}
@@ -70,22 +74,88 @@ export function Navbar() {
               </Link>
             </li>
           ))}
+
+          {/* Authenticated Links based on strictly verified roles */}
+          {user && (
+            <>
+              {isPartnerOnly ? (
+                <li>
+                  <Link
+                    to="/partner"
+                    activeProps={{ className: "text-primary-deep font-semibold" }}
+                    className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    Partner Portal
+                  </Link>
+                </li>
+              ) : (
+                <>
+                  <li>
+                    <Link
+                      to="/dashboard"
+                      activeProps={{ className: "text-primary-deep font-semibold" }}
+                      className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      Dashboard
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/batches"
+                      activeProps={{ className: "text-primary-deep font-semibold" }}
+                      className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                    >
+                      Batches
+                    </Link>
+                  </li>
+                  {isAdmin && (
+                    <li>
+                      <Link
+                        to="/partner"
+                        activeProps={{ className: "text-primary-deep font-semibold" }}
+                        className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        Partner Portal
+                      </Link>
+                    </li>
+                  )}
+                </>
+              )}
+              {isAdmin && (
+                <li>
+                  <Link
+                    to="/admin"
+                    activeProps={{ className: "text-primary-deep font-semibold" }}
+                    className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+                  >
+                    Admin
+                  </Link>
+                </li>
+              )}
+            </>
+          )}
         </ul>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {user ? (
             <>
-              <Button asChild variant="honey" size="sm">
-                <Link to="/dashboard">Dashboard</Link>
+              <Link
+                to="/profile"
+                className="hidden sm:flex items-center gap-1.5 text-xs font-semibold text-muted-foreground hover:text-foreground border border-border px-2.5 py-1 rounded-full bg-muted/50"
+              >
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                {roles[0] || "member"}
+              </Link>
+              <Button variant="ghost" size="sm" onClick={signOut} className="active:scale-95">
+                Sign out
               </Button>
-              <Button variant="ghost" size="sm" onClick={signOut}>Sign out</Button>
             </>
           ) : (
             <>
               <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
                 <Link to="/verify">Verify Jar</Link>
               </Button>
-              <Button asChild variant="honey" size="sm">
+              <Button asChild variant="honey" size="sm" className="active:scale-95">
                 <Link to="/login">Login</Link>
               </Button>
             </>
