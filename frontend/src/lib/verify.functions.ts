@@ -56,7 +56,7 @@ function publicClient() {
 }
 
 export const getPublicBatch = createServerFn({ method: "GET" })
-  .inputValidator((d) => z.object({ id: z.string().trim().min(1).max(40) }).parse(d))
+  .validator((d) => z.object({ id: z.string().trim().min(1).max(40) }).parse(d))
   .handler(async ({ data }): Promise<PublicBatch | null> => {
     const sb = publicClient();
     if (!sb) return null;
@@ -86,7 +86,7 @@ export const getPublicBatch = createServerFn({ method: "GET" })
   });
 
 export const addTastingNote = createServerFn({ method: "POST" })
-  .inputValidator((d) =>
+  .validator((d) =>
     z
       .object({
         batchId: z.string().trim().min(1).max(40),

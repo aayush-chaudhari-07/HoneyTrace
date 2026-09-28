@@ -30,6 +30,27 @@ BEGIN
     role = EXCLUDED.role,
     email = EXCLUDED.email;
 
+  -- Also sync to user_roles if table exists
+  BEGIN
+    INSERT INTO public.user_roles (user_id, role)
+    VALUES (NEW.id, assigned_role::text)
+    ON CONFLICT DO NOTHING;
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END;
+
+  -- Also sync to profiles if table exists
+  BEGIN
+    INSERT INTO public.profiles (id, display_name)
+    VALUES (
+      NEW.id,
+      COALESCE(NEW.raw_user_meta_data->>'full_name', NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1))
+    )
+    ON CONFLICT (id) DO UPDATE SET display_name = EXCLUDED.display_name;
+  EXCEPTION WHEN OTHERS THEN
+    NULL;
+  END;
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

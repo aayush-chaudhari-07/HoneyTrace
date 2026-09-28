@@ -5,7 +5,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 /** Ask the AI to review a hive's recent readings and flag anomalies. */
 export const analyzeHive = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ hiveId: z.string().uuid() }).parse(d))
+  .validator((d) => z.object({ hiveId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { data: hive } = await context.supabase.from("hives").select("name").eq("id", data.hiveId).maybeSingle();
     if (!hive) throw new Error("Hive not found");

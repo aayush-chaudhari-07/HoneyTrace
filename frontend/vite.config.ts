@@ -1,6 +1,5 @@
 import { defineConfig } from "vite";
 import tailwindcss from "@tailwindcss/vite";
-import tsconfigPaths from "vite-tsconfig-paths";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import { nitro } from "nitro/vite";
 import path from "node:path";
@@ -29,8 +28,10 @@ export default defineConfig(({ command }) => ({
     // Adding react() on top creates dual JSX runtime registration which
     // causes "jsxDEV is not a function" in the Nitro SSR bundle.
     tailwindcss(),
-    tsconfigPaths(),
   ],
+  resolve: {
+    tsconfigPaths: true,
+  },
   server: {
     port: 5173,
     host: true,

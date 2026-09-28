@@ -57,10 +57,10 @@ async function seedDemoData() {
       console.warn(`⚠️ Supabase Auth seed note (${u.email}):`, err.message);
     }
 
-    try {
-      // 1b. Upsert into public.users table
+      // 1b. Upsert into public.users, user_roles, and profiles tables
       await supabaseAdmin.from("users").upsert(u, { onConflict: "id" });
       await supabaseAdmin.from("user_roles").upsert({ user_id: u.id, role: u.role }, { onConflict: "user_id,role" });
+      await supabaseAdmin.from("profiles").upsert({ id: u.id, display_name: u.name }, { onConflict: "id" });
     } catch (err) {
       console.warn(`⚠️ User profile DB upsert note (${u.email}):`, err.message);
     }
