@@ -49,12 +49,17 @@ export const blockchainService = {
 
     if (rpcUrl && privateKey && contractAddress && ethers.isAddress(contractAddress)) {
       try {
-        const provider = new ethers.JsonRpcProvider(rpcUrl);
+        const provider = new ethers.JsonRpcProvider(rpcUrl, { name: "custom", chainId: 31337 }, { staticNetwork: true });
         const wallet = new ethers.Wallet(privateKey, provider);
         const contract = new ethers.Contract(contractAddress, ABI, wallet);
 
         const bytes32BatchId = batchIdToBytes32(batchId);
-        const tx = await contract.recordStage(bytes32BatchId, stage, actor, dataHash, timestamp);
+        
+        // Timeout blockchain calls to avoid hanging serverless / RPC requests
+        const tx = await Promise.race([
+          contract.recordStage(bytes32BatchId, stage, actor, dataHash, timestamp),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("RPC Timeout")), 3500)),
+        ]);
         const receipt = await tx.wait();
 
         return {
@@ -101,10 +106,13 @@ export const blockchainService = {
 
     if (rpcUrl && contractAddress && ethers.isAddress(contractAddress)) {
       try {
-        const provider = new ethers.JsonRpcProvider(rpcUrl);
+        const provider = new ethers.JsonRpcProvider(rpcUrl, { name: "custom", chainId: 31337 }, { staticNetwork: true });
         const contract = new ethers.Contract(contractAddress, ABI, provider);
         const bytes32BatchId = batchIdToBytes32(batchId);
-        const history = await contract.getCustodyHistory(bytes32BatchId);
+        const history = await Promise.race([
+          contract.getCustodyHistory(bytes32BatchId),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("RPC Timeout")), 2500)),
+        ]);
         return history.map((h) => ({
           batchId: h.batchId,
           stage: h.stage,

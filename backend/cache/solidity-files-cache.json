@@ -1,0 +1,41 @@
+{
+  "_format": "hh-sol-cache-2",
+  "files": {
+    "C:\\Users\\ayush\\Downloads\\Honey Trace\\honey-trace-main\\backend\\contracts\\HoneyCustody.sol": {
+      "lastModificationDate": 1790438364541,
+      "contentHash": "c1050363f053025b057cc7b0e6cffe8b",
+      "sourceName": "contracts/HoneyCustody.sol",
+      "solcConfig": {
+        "version": "0.8.20",
+        "settings": {
+          "evmVersion": "paris",
+          "optimizer": {
+            "enabled": false,
+            "runs": 200
+          },
+          "outputSelection": {
+            "*": {
+              "*": [
+                "abi",
+                "evm.bytecode",
+                "evm.deployedBytecode",
+                "evm.methodIdentifiers",
+                "metadata"
+              ],
+              "": [
+                "ast"
+              ]
+            }
+          }
+        }
+      },
+      "imports": [],
+      "versionPragmas": [
+        "^0.8.20"
+      ],
+      "artifacts": [
+        "HoneyCustody"
+      ]
+    }
+  }
+}

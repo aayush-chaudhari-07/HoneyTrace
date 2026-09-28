@@ -1,4 +1,4 @@
-import "./config/env.js";
+import { verifyEnvironmentVars } from "./config/env.js";
 import express from "express";
 import cors from "cors";
 
@@ -15,7 +15,7 @@ import publicRoutes from "./routes/public.routes.js";
 import { errorHandler } from "./middleware/error.middleware.js";
 import { requestLogger } from "./middleware/logger.middleware.js";
 
-dotenv.config();
+verifyEnvironmentVars();
 
 const app = express();
 

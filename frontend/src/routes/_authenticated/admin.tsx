@@ -2,14 +2,17 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { ShieldCheck } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { getMyRoles } from "@/lib/roles";
+import { getMyRoles, PARTNER_ROLES } from "@/lib/roles";
 import { AppShell } from "@/components/AppShell";
 import { HoneycombLoader } from "@/components/HoneycombLoader";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   beforeLoad: async ({ context }) => {
     const roles = await getMyRoles(context.user.id);
-    if (!roles.includes("admin")) throw redirect({ to: "/dashboard" });
+    if (!roles.includes("admin")) {
+      const isPartner = roles.some((r) => (PARTNER_ROLES as readonly string[]).includes(r as any));
+      throw redirect({ to: isPartner ? "/partner" : "/dashboard" });
+    }
   },
   head: () => ({
     meta: [

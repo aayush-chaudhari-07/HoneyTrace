@@ -1,16 +1,25 @@
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 import { supabaseAdmin } from "../server/config/supabase.js";
 import { blockchainService } from "../server/services/blockchain.service.js";
 import { qrService } from "../server/services/qr.service.js";
+import { hivesService } from "../server/services/hives.service.js";
+import { batchesService } from "../server/services/batches.service.js";
+import { partnerService } from "../server/services/partner.service.js";
+import { publicService } from "../server/services/public.service.js";
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 /**
- * Seed Script for HoneyTrace Demo Data
- * Creates users for all roles, hives, historical readings, and a fully completed batch demo lifecycle.
+ * Idempotent Seed Script for HoneyTrace Demo Data
+ * Creates Auth Users across all 6 roles (with password: Password123!), hives with readings & anomalies,
+ * and 3 demo batches at different supply chain stages.
  */
 async function seedDemoData() {
-  console.log("🐝 Starting HoneyTrace Database & Supply Chain Seed...");
+  console.log("🐝 Starting HoneyTrace Idempotent Database & Supply Chain Seed...");
 
   // 1. Define Demo Users across all roles
   const usersToSeed = [
@@ -23,210 +32,180 @@ async function seedDemoData() {
   ];
 
   for (const u of usersToSeed) {
-    const { error } = await supabaseAdmin.from("users").upsert(u, { onConflict: "id" });
-    if (error) console.warn(`⚠️ User upsert warning (${u.email}):`, error.message);
+    try {
+      // 1a. Ensure user exists in Supabase Auth
+      const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
+      const authUser = existingUsers?.users?.find((x) => x.email === u.email);
+
+      if (!authUser) {
+        await supabaseAdmin.auth.admin.createUser({
+          id: u.id,
+          email: u.email,
+          password: "Password123!",
+          email_confirm: true,
+          user_metadata: { full_name: u.name, role: u.role },
+        });
+        console.log(`👤 Created Auth user: ${u.email}`);
+      } else {
+        await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
+          password: "Password123!",
+          user_metadata: { full_name: u.name, role: u.role },
+        });
+        console.log(`👤 Updated Auth user: ${u.email}`);
+      }
+    } catch (err) {
+      console.warn(`⚠️ Supabase Auth seed note (${u.email}):`, err.message);
+    }
+
+    try {
+      // 1b. Upsert into public.users table
+      await supabaseAdmin.from("users").upsert(u, { onConflict: "id" });
+      await supabaseAdmin.from("user_roles").upsert({ user_id: u.id, role: u.role }, { onConflict: "user_id,role" });
+    } catch (err) {
+      console.warn(`⚠️ User profile DB upsert note (${u.email}):`, err.message);
+    }
   }
-  console.log("✅ Users seeded cleanly.");
 
   const beekeeperId = usersToSeed[0].id;
+  const labUserId = usersToSeed[1].id;
+  const bottlerUserId = usersToSeed[2].id;
+  const distUserId = usersToSeed[3].id;
+  const retailerUserId = usersToSeed[4].id;
 
-  // 2. Define Demo Hives
+  // 2. Define Demo Hives (including 1 hive with anomaly)
   const hivesToSeed = [
     { id: "11111111-1111-4000-a000-111111111111", owner_id: beekeeperId, location_lat: 12.5234, location_lng: 75.8123, current_health_category: "healthy" },
     { id: "22222222-2222-4000-a000-222222222222", owner_id: beekeeperId, location_lat: 12.5289, location_lng: 75.8178, current_health_category: "healthy" },
-    { id: "33333333-3333-4000-a000-333333333333", owner_id: beekeeperId, location_lat: 12.5310, location_lng: 75.8201, current_health_category: "needs_attention" },
+    { id: "33333333-3333-4000-a000-333333333333", owner_id: beekeeperId, location_lat: 12.5310, location_lng: 75.8201, current_health_category: "critical" }, // Anomaly Hive
     { id: "44444444-4444-4000-a000-444444444444", owner_id: beekeeperId, location_lat: 12.5190, location_lng: 75.8055, current_health_category: "healthy" },
   ];
 
   for (const h of hivesToSeed) {
-    const { error } = await supabaseAdmin.from("hives").upsert(h, { onConflict: "id" });
-    if (error) console.warn(`⚠️ Hive upsert warning (${h.id}):`, error.message);
+    await hivesService.createHive(h);
   }
   console.log("✅ 4 Hives seeded cleanly.");
 
   // 3. Seed Historical Readings for Hives
-  const readingsToInsert = [];
   const now = Date.now();
   for (const h of hivesToSeed) {
     for (let day = 14; day >= 0; day--) {
       const ts = new Date(now - day * 24 * 60 * 60 * 1000).toISOString();
-      const temp = Number((34.0 + (Math.random() * 1.5 - 0.75)).toFixed(1));
-      const hum = Number((54.0 + (Math.random() * 4 - 2)).toFixed(1));
-      const weight = Number((42.0 - day * 0.15 + Math.random() * 0.2).toFixed(1));
-      const activity = Math.floor(75 + Math.random() * 20);
+      let temp = Number((34.0 + (Math.random() * 1.5 - 0.75)).toFixed(1));
+      let hum = Number((54.0 + (Math.random() * 4 - 2)).toFixed(1));
+      let weight = Number((42.0 - day * 0.15 + Math.random() * 0.2).toFixed(1));
+      let activity = Math.floor(75 + Math.random() * 20);
 
-      readingsToInsert.push({
-        hive_id: h.id,
-        timestamp: ts,
+      // Trigger anomaly on Hive 3 on recent days
+      if (h.id === hivesToSeed[2].id && day <= 2) {
+        weight = 28.5; // Sudden >30% weight drop
+        temp = 41.2;  // Temperature spike
+        activity = 20; // Severe activity drop
+      }
+
+      await hivesService.addReadingAndEvaluateHealth(h.id, {
         temperature: temp,
         humidity: hum,
         weight: weight,
         activity_level: activity,
-        notes: `Daily telemetric sensor check ${day} days ago`,
+        notes: day === 0 ? "Latest telemetric sensor sync" : `Daily telemetric check ${day}d ago`,
+        timestamp: ts,
       });
     }
   }
+  console.log("✅ Sensor Readings seeded with hive anomaly.");
 
-  const { error: rErr } = await supabaseAdmin.from("readings").insert(readingsToInsert);
-  if (rErr) console.warn("⚠️ Readings insertion warning:", rErr.message);
-  console.log(`✅ ${readingsToInsert.length} Sensor Readings seeded.`);
+  // 4. Create 3 Demo Batches at Different Lifecycle Stages
 
-  // 4. Walk a Full Batch Lifecycle through all stages
-  const demoBatchId = "b0000000-0000-4000-a000-000000000101";
-
-  // Cleanup existing batch & related rows if already present
-  await supabaseAdmin.from("batches").delete().eq("id", demoBatchId);
-
-  // Stage 1: Create Batch (draft)
-  const { data: batchDraft, error: bErr } = await supabaseAdmin
-    .from("batches")
-    .insert({
-      id: demoBatchId,
-      source_hive_ids: [hivesToSeed[0].id, hivesToSeed[1].id],
-      harvest_start_date: new Date(now - 14 * 86400000).toISOString(),
-      harvest_end_date: new Date(now - 12 * 86400000).toISOString(),
-      forage_location: "Wildflower & Clover Apiary Meadow, Coorg Valley",
-      status: "draft",
-      created_by: beekeeperId,
-    })
-    .select()
-    .single();
-
-  if (bErr) throw bErr;
-  console.log(`📌 Stage 1 [draft]: Batch created -> ${batchDraft.id}`);
-
-  // Stage 2: Seal Batch (sealed)
-  const qrRes = await qrService.generateAndStoreBatchQr(demoBatchId);
-  const chain1 = await blockchainService.recordCustodyStage(demoBatchId, "beekeeper", beekeeperId, {
-    sealed_at: new Date(now - 12 * 86400000).toISOString(),
-    qr_code_id: qrRes.qrCodeId,
+  // Batch 1: Draft Batch
+  const draftBatch = await batchesService.validateAndCreateBatch({
+    userId: beekeeperId,
+    userRole: "beekeeper",
+    source_hive_ids: [hivesToSeed[3].id],
+    harvest_start_date: new Date(now - 3 * 86400000).toISOString(),
+    harvest_end_date: new Date(now - 1 * 86400000).toISOString(),
+    forage_location: "Highland Forest Apiary",
   });
+  console.log(`📌 Demo Batch 1 [draft]: ${draftBatch.id}`);
 
-  await supabaseAdmin.from("custody_records").insert({
-    batch_id: demoBatchId,
-    stage: "beekeeper",
-    actor_user_id: beekeeperId,
-    timestamp: new Date(now - 12 * 86400000).toISOString(),
-    data_hash: chain1.dataHash,
-    storage_reference: chain1.txHash,
-    extra_data: { sealed_at: new Date(now - 12 * 86400000).toISOString(), notes: "Harvested and sealed at source apiary" },
+  // Batch 2: Active Batch at Lab Stage
+  const activeBatch = await batchesService.validateAndCreateBatch({
+    userId: beekeeperId,
+    userRole: "beekeeper",
+    source_hive_ids: [hivesToSeed[1].id],
+    harvest_start_date: new Date(now - 7 * 86400000).toISOString(),
+    harvest_end_date: new Date(now - 5 * 86400000).toISOString(),
+    forage_location: "Wild Acacia Grove",
   });
+  await batchesService.sealBatch(activeBatch.id, beekeeperId, "beekeeper");
+  console.log(`📌 Demo Batch 2 [sealed/lab]: ${activeBatch.id}`);
 
-  await supabaseAdmin
-    .from("batches")
-    .update({
-      status: "sealed",
-      blockchain_record_id: `0x${demoBatchId.replace(/-/g, "").substring(0, 16)}`,
-      qr_code_id: qrRes.qrCodeId,
-    })
-    .eq("id", demoBatchId);
+  // Batch 3: Fully Completed Batch (Delivered) with full lifecycle, QR, Lab Report, and Feedback
+  const completedBatchId = "b0000000-0000-4000-a000-000000000101";
+  
+  // Create & seal
+  const compBatch = await batchesService.validateAndCreateBatch({
+    id: completedBatchId,
+    userId: beekeeperId,
+    userRole: "beekeeper",
+    source_hive_ids: [hivesToSeed[0].id, hivesToSeed[1].id],
+    harvest_start_date: new Date(now - 14 * 86400000).toISOString(),
+    harvest_end_date: new Date(now - 12 * 86400000).toISOString(),
+    forage_location: "Wildflower & Clover Apiary Meadow, Coorg Valley",
+  });
+  
+  // Force fixed ID for deterministic QR link
+  compBatch.id = completedBatchId;
+  const qrRes = await qrService.generateAndStoreBatchQr(completedBatchId);
+  compBatch.qr_code_id = qrRes.qrCodeId;
+  compBatch.blockchain_record_id = `0x${completedBatchId.replace(/-/g, "").substring(0, 16)}`;
+  await batchesService.sealBatch(completedBatchId, beekeeperId, "beekeeper");
 
-  console.log("📌 Stage 2 [sealed]: Batch sealed & initial custody recorded on-chain.");
-
-  // Stage 3: Lab Purity Testing (lab)
-  const labUserId = usersToSeed[1].id;
-  const labData = {
+  // Walk through lab -> bottler -> distributor -> retailer
+  await partnerService.updatePartnerBatchStage(completedBatchId, { id: labUserId, role: "lab" }, {
     results_summary: "Purity 99.8% - NMR Verified Pure Blossom Honey. Zero adulterants detected.",
-    certificate_url: "https://honeytrace.io/certificates/lab-cert-101.pdf",
-  };
-
-  const chain2 = await blockchainService.recordCustodyStage(demoBatchId, "lab", labUserId, labData);
-
-  await supabaseAdmin.from("lab_tests").insert({
-    batch_id: demoBatchId,
-    results_summary: labData.results_summary,
-    certificate_storage_reference: labData.certificate_url,
-    created_at: new Date(now - 9 * 86400000).toISOString(),
+    certificate_file: "https://honeytrace.io/certificates/lab-cert-101.pdf",
   });
 
-  await supabaseAdmin.from("custody_records").insert({
-    batch_id: demoBatchId,
-    stage: "lab",
-    actor_user_id: labUserId,
-    timestamp: new Date(now - 9 * 86400000).toISOString(),
-    data_hash: chain2.dataHash,
-    storage_reference: chain2.txHash,
-    extra_data: labData,
+  await partnerService.updatePartnerBatchStage(completedBatchId, { id: bottlerUserId, role: "bottler" }, {
+    jar_count: 1200,
+    notes: "Packaged in eco-friendly 500g glass jars with seal.",
   });
 
-  await supabaseAdmin.from("batches").update({ status: "bottler" }).eq("id", demoBatchId);
-  console.log("📌 Stage 3 [lab]: Lab test recorded & status advanced to 'bottler'.");
-
-  // Stage 4: Bottling (bottler)
-  const bottlerUserId = usersToSeed[2].id;
-  const bottlerData = { jar_count: 1200, notes: "Packaged in eco-friendly 500g glass jars with seal." };
-  const chain3 = await blockchainService.recordCustodyStage(demoBatchId, "bottler", bottlerUserId, bottlerData);
-
-  await supabaseAdmin.from("custody_records").insert({
-    batch_id: demoBatchId,
-    stage: "bottler",
-    actor_user_id: bottlerUserId,
-    timestamp: new Date(now - 6 * 86400000).toISOString(),
-    data_hash: chain3.dataHash,
-    storage_reference: chain3.txHash,
-    extra_data: bottlerData,
-  });
-
-  await supabaseAdmin.from("batches").update({ status: "distributor" }).eq("id", demoBatchId);
-  console.log("📌 Stage 4 [bottler]: 1,200 Jars bottled & status advanced to 'distributor'.");
-
-  // Stage 5: Logistics & Distribution (distributor)
-  const distUserId = usersToSeed[3].id;
-  const distData = {
+  await partnerService.updatePartnerBatchStage(completedBatchId, { id: distUserId, role: "distributor" }, {
     transport_details: "Refrigerated Express Transit #TX-902",
     current_location: "Metro Distribution Center",
     temperature_log: "18.5°C constant climate controlled",
-  };
-  const chain4 = await blockchainService.recordCustodyStage(demoBatchId, "distributor", distUserId, distData);
-
-  await supabaseAdmin.from("custody_records").insert({
-    batch_id: demoBatchId,
-    stage: "distributor",
-    actor_user_id: distUserId,
-    timestamp: new Date(now - 3 * 86400000).toISOString(),
-    data_hash: chain4.dataHash,
-    storage_reference: chain4.txHash,
-    extra_data: distData,
   });
 
-  await supabaseAdmin.from("batches").update({ status: "shelf" }).eq("id", demoBatchId);
-  console.log("📌 Stage 5 [distributor]: Transit completed & status advanced to 'shelf'.");
-
-  // Stage 6: Retailer & Final Delivery (shelf -> delivered)
-  const retailerUserId = usersToSeed[4].id;
-  const retailData = {
+  await partnerService.updatePartnerBatchStage(completedBatchId, { id: retailerUserId, role: "retailer" }, {
     store_name: "GreenField Organic Market",
     store_location: "742 Evergreen Terrace, Sector 4",
-  };
-  const chain5 = await blockchainService.recordCustodyStage(demoBatchId, "shelf", retailerUserId, retailData);
-
-  await supabaseAdmin.from("custody_records").insert({
-    batch_id: demoBatchId,
-    stage: "shelf",
-    actor_user_id: retailerUserId,
-    timestamp: new Date(now - 1 * 86400000).toISOString(),
-    data_hash: chain5.dataHash,
-    storage_reference: chain5.txHash,
-    extra_data: retailData,
   });
 
-  await supabaseAdmin.from("batches").update({ status: "delivered" }).eq("id", demoBatchId);
-  console.log("📌 Stage 6 [shelf/delivered]: Stocked at GreenField Market & marked 'delivered'.");
-
-  // 5. Seed Consumer Feedback
-  await supabaseAdmin.from("feedback").insert({
-    batch_id: demoBatchId,
+  // Add Consumer Feedback
+  await publicService.addPublicFeedback(completedBatchId, {
     rating: 5,
     tasting_notes: "Rich floral aroma with distinct wild thyme undertones. Incredible purity!",
     submitter_name: "Sophia Chen",
   });
 
-  console.log("\n🎉 HoneyTrace Demo Data Seeding Complete!");
-  console.log(`🔗 Demo Batch Verification ID: ${demoBatchId}`);
+  console.log("\n🎉 HoneyTrace Seed Complete!");
+  console.log("==========================================================================");
+  console.log("DEMO ACCOUNTS (Password for all accounts: Password123!):");
+  console.log(" - Beekeeper:    beekeeper@honeytrace.io");
+  console.log(" - Lab:          lab@honeytrace.io");
+  console.log(" - Bottler:      bottler@honeytrace.io");
+  console.log(" - Distributor:  distributor@honeytrace.io");
+  console.log(" - Retailer:     retailer@honeytrace.io");
+  console.log(" - Admin:        admin@honeytrace.io");
+  console.log("==========================================================================");
+  console.log(`🔗 Fully Completed Batch ID: ${completedBatchId}`);
   console.log(`📱 QR Code ID: ${qrRes.qrCodeId}`);
+  console.log(`🌐 Verification Link: http://localhost:5173/verify/${completedBatchId}`);
+  console.log("==========================================================================");
 }
 
 seedDemoData().catch((err) => {
-  console.error("❌ Seed failed:", err);
+  console.error("❌ Seed failed:", err.message);
   process.exit(1);
 });

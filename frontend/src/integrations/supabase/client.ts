@@ -28,9 +28,9 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 export function getSupabaseEnv() {
   const url = import.meta.env['VITE_SUPABASE_URL'] || (typeof process !== 'undefined' ? process.env['SUPABASE_URL'] : undefined);
   const key = 
-    import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'] || 
     import.meta.env['VITE_SUPABASE_ANON_KEY'] || 
-    (typeof process !== 'undefined' ? (process.env['SUPABASE_PUBLISHABLE_KEY'] || process.env['SUPABASE_ANON_KEY']) : undefined);
+    import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'] || 
+    (typeof process !== 'undefined' ? (process.env['SUPABASE_ANON_KEY'] || process.env['SUPABASE_PUBLISHABLE_KEY']) : undefined);
   
   return { url, key };
 }
