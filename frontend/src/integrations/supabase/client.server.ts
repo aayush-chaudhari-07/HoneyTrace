@@ -30,14 +30,18 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 function createSupabaseAdminClient() {
-  const SUPABASE_URL = process.env['SUPABASE_URL'];
+  const SUPABASE_URL = process.env['SUPABASE_URL'] || process.env['VITE_SUPABASE_URL'];
   const SUPABASE_SERVICE_ROLE_KEY = process.env['SUPABASE_SERVICE_ROLE_KEY'];
 
   // Graceful degradation: without a connected backend, return a client that
   // fails individual requests (handled by route error states) instead of
   // throwing at creation and turning every server function into a 500.
   if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-    console.warn('[Supabase] Not connected yet — server functions will return errors until SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.');
+    const missing = [
+      ...(!SUPABASE_URL ? ['SUPABASE_URL / VITE_SUPABASE_URL'] : []),
+      ...(!SUPABASE_SERVICE_ROLE_KEY ? ['SUPABASE_SERVICE_ROLE_KEY'] : []),
+    ];
+    console.warn(`[Supabase Admin] ⚠️ Configuration missing: ${missing.join(', ')}. Set these environment variables in Vercel project settings.`);
     return createClient<Database>('https://supabase-not-connected.invalid', 'not-connected', {
       global: {
         fetch: createSupabaseFetch('not-connected'),

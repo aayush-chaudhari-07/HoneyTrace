@@ -1,8 +1,8 @@
 import { i as __toESM, r as __require, t as __commonJSMin } from "../../_runtime.mjs";
 import { n as require_react } from "../@radix-ui/react-compose-refs+[...].mjs";
+import { n as require_jsx_runtime } from "../radix-ui__react-context+react.mjs";
 import { l as require_react_dom } from "../@radix-ui/react-dialog+[...].mjs";
 import { r as parseHref } from "../tanstack__history.mjs";
-import { n as require_jsx_runtime } from "../radix-ui__react-context+react.mjs";
 import { PassThrough, Readable } from "node:stream";
 import { ReadableStream as ReadableStream$1 } from "node:stream/web";
 //#region node_modules/@tanstack/react-router/dist/esm/utils.js
@@ -3644,11 +3644,11 @@ var BaseRootRoute = class extends BaseRoute {
 };
 //#endregion
 //#region node_modules/@tanstack/router-core/dist/esm/ssr/constants.js
+var import_jsx_runtime = require_jsx_runtime();
 var GLOBAL_TSR = "$_TSR";
 var TSR_SCRIPT_BARRIER_ID = "$tsr-stream-barrier";
 //#endregion
 //#region node_modules/@tanstack/react-router/dist/esm/CatchBoundary.js
-var import_jsx_runtime = require_jsx_runtime();
 function CatchBoundary(props) {
 	const errorComponent = props.errorComponent ?? ErrorComponent;
 	return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(CatchBoundaryImpl, {

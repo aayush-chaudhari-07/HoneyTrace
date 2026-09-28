@@ -37,18 +37,32 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  console.error(error);
+  const errorMessage = error?.message || String(error || "Unknown error");
+  const errorStack = error?.stack || "";
+  console.error("[HoneyTrace Root Error]", errorMessage, errorStack);
   const router = useRouter();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
-      <div className="max-w-md text-center">
+    <div className="flex min-h-screen items-center justify-center bg-background px-4 py-12">
+      <div className="max-w-lg text-center w-full">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           This page didn't load
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end. You can try refreshing or head back home.
+          Something went wrong rendering this page.
         </p>
+
+        <details className="mt-4 text-left border border-destructive/30 bg-destructive/10 rounded-lg p-3 text-xs text-destructive">
+          <summary className="cursor-pointer font-medium hover:underline">
+            Error Details: {errorMessage}
+          </summary>
+          {errorStack && (
+            <pre className="mt-2 max-h-48 overflow-auto whitespace-pre-wrap font-mono text-[10px] opacity-90">
+              {errorStack}
+            </pre>
+          )}
+        </details>
+
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <Button
             onClick={() => {

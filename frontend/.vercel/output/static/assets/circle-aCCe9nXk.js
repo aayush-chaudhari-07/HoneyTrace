@@ -1,1 +1,0 @@
-import{T as e}from"./index-cOCpdL4_.js";var t=e(`circle`,[[`circle`,{cx:`12`,cy:`12`,r:`10`,key:`1mglay`}]]);export{t};

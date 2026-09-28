@@ -1,1 +1,0 @@
-import{t as e}from"./jsx-dev-runtime-CwX10inW.js";import{W as t}from"./index-cOCpdL4_.js";var n=e(),r=`C:/Users/ayush/Downloads/Honey Trace/honey-trace-main/frontend/src/routes/_authenticated/route.tsx?tsr-split=component`,i=()=>(0,n.jsxDEV)(t,{},void 0,!1,{fileName:r,lineNumber:2,columnNumber:30},void 0);export{i as component};

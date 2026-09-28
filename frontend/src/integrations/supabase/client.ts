@@ -26,12 +26,21 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 export function getSupabaseEnv() {
-  const url = import.meta.env['VITE_SUPABASE_URL'] || (typeof process !== 'undefined' ? process.env['SUPABASE_URL'] : undefined);
-  const key = 
-    import.meta.env['VITE_SUPABASE_ANON_KEY'] || 
-    import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY'] || 
-    (typeof process !== 'undefined' ? (process.env['SUPABASE_ANON_KEY'] || process.env['SUPABASE_PUBLISHABLE_KEY']) : undefined);
-  
+  const url =
+    (typeof import.meta !== 'undefined' && import.meta.env ? (import.meta.env['VITE_SUPABASE_URL'] as string) : undefined) ||
+    (typeof process !== 'undefined' ? (process.env['VITE_SUPABASE_URL'] || process.env['SUPABASE_URL']) : undefined);
+
+  const key =
+    (typeof import.meta !== 'undefined' && import.meta.env
+      ? (import.meta.env['VITE_SUPABASE_ANON_KEY'] || import.meta.env['VITE_SUPABASE_PUBLISHABLE_KEY']) as string
+      : undefined) ||
+    (typeof process !== 'undefined'
+      ? (process.env['VITE_SUPABASE_ANON_KEY'] ||
+          process.env['VITE_SUPABASE_PUBLISHABLE_KEY'] ||
+          process.env['SUPABASE_ANON_KEY'] ||
+          process.env['SUPABASE_PUBLISHABLE_KEY'])
+      : undefined);
+
   return { url, key };
 }
 
@@ -42,38 +51,29 @@ export function isSupabaseConfigured(): boolean {
 
 function createSupabaseClient() {
   const { url: SUPABASE_URL, key: SUPABASE_KEY } = getSupabaseEnv();
-
-  const isConnected = Boolean(SUPABASE_URL && SUPABASE_KEY);
+  const isConnected = isSupabaseConfigured();
 
   if (typeof window !== 'undefined') {
     if (isConnected) {
       console.log(`[HoneyTrace Supabase] ✅ Connected to URL: ${SUPABASE_URL} (Key: ${SUPABASE_KEY!.slice(0, 6)}...${SUPABASE_KEY!.slice(-4)})`);
     } else {
-      console.warn('[HoneyTrace Supabase] ⚠️ Not connected! Add VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY) to frontend/.env');
+      console.warn('[HoneyTrace Supabase] ⚠️ Configuration missing: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY) must be set in Vercel environment variables.');
     }
+  } else if (!isConnected) {
+    console.warn('[HoneyTrace Supabase] ⚠️ Configuration missing: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY) must be set in server environment variables.');
   }
 
-  if (!SUPABASE_URL || !SUPABASE_KEY) {
-    return createClient<Database>('https://supabase-not-connected.invalid', 'not-connected', {
-      global: {
-        fetch: createSupabaseFetch('not-connected'),
-      },
-      auth: {
-        storage: typeof window !== 'undefined' ? localStorage : undefined,
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
-  }
+  const effectiveUrl = isConnected ? SUPABASE_URL! : 'https://supabase-not-connected.invalid';
+  const effectiveKey = isConnected ? SUPABASE_KEY! : 'not-connected';
 
-  return createClient<Database>(SUPABASE_URL, SUPABASE_KEY, {
+  return createClient<Database>(effectiveUrl, effectiveKey, {
     global: {
-      fetch: createSupabaseFetch(SUPABASE_KEY),
+      fetch: createSupabaseFetch(effectiveKey),
     },
     auth: {
       storage: typeof window !== 'undefined' ? localStorage : undefined,
-      persistSession: true,
-      autoRefreshToken: true,
+      persistSession: typeof window !== 'undefined',
+      autoRefreshToken: typeof window !== 'undefined',
     },
   });
 }
@@ -83,6 +83,25 @@ let _supabase: ReturnType<typeof createSupabaseClient> | undefined;
 export const supabase = new Proxy({} as ReturnType<typeof createSupabaseClient>, {
   get(_, prop, receiver) {
     if (!_supabase) _supabase = createSupabaseClient();
+    if (!isSupabaseConfigured()) {
+      if (prop === 'auth') {
+        return {
+          onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+          getSession: async () => ({ data: { session: null }, error: null }),
+          getUser: async () => ({ data: { user: null }, error: null }),
+          signInWithPassword: async () => {
+            throw new Error('Configuration missing: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY) must be set in Vercel environment variables.');
+          },
+          signUp: async () => {
+            throw new Error('Configuration missing: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY) must be set in Vercel environment variables.');
+          },
+          signOut: async () => {},
+          resetPasswordForEmail: async () => {
+            throw new Error('Configuration missing: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (or VITE_SUPABASE_PUBLISHABLE_KEY) must be set in Vercel environment variables.');
+          },
+        };
+      }
+    }
     return Reflect.get(_supabase, prop, receiver);
   },
 });
