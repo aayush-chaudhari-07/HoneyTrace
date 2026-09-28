@@ -113,7 +113,7 @@ export const publicService = {
     }
 
     const cleanCode = String(codeQuery).trim();
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontendUrl = process.env.PUBLIC_SITE_URL || process.env.FRONTEND_URL || "http://localhost:5173";
 
     // 1. Check direct UUID lookup
     if (isValidUuid(cleanCode)) {

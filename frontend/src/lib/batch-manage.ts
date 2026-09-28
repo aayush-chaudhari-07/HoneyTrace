@@ -96,4 +96,10 @@ export function stageFor(step: ManagedStep): (typeof CUSTODY)[number]["key"] | n
   return CUSTODY.find((c) => c.match.some((m) => s.includes(m)))?.key ?? null;
 }
 
-export const verifyUrl = (id: string) => `${typeof window !== "undefined" ? window.location.origin : ""}/verify/${encodeURIComponent(id)}`;
+export function verifyUrl(id: string): string {
+  const base =
+    (typeof process !== "undefined" ? process.env["PUBLIC_SITE_URL"] || process.env["VITE_PUBLIC_SITE_URL"] : undefined) ||
+    (typeof import.meta !== "undefined" && import.meta.env ? (import.meta.env["VITE_PUBLIC_SITE_URL"] as string) : undefined) ||
+    (typeof window !== "undefined" && window.location?.origin ? window.location.origin : "");
+  return `${base.replace(/\/$/, "")}/verify/${encodeURIComponent(id)}`;
+}

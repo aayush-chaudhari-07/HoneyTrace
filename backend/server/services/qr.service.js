@@ -13,7 +13,7 @@ export const qrService = {
    * Stores the QR image in Supabase Storage ('batch-documents' bucket) and returns the public URL + reference ID.
    */
   async generateAndStoreBatchQr(batchId) {
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontendUrl = process.env.PUBLIC_SITE_URL || process.env.FRONTEND_URL || "http://localhost:5173";
     const verificationUrl = `${frontendUrl}/verify/${batchId}`;
 
     // 1. Generate QR code Data URL (PNG)
